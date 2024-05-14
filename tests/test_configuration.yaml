@@ -1,0 +1,4 @@
+---
+log_level: WARN
+transmission:
+  username: from_configuration

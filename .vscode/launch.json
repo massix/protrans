@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "delve",
+      "name": "Debug",
+      "request": "launch",
+      "program": "${workspaceFolder}/cmd/protrans/*"
+    }
+  ]
+}
