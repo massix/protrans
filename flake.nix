@@ -22,7 +22,7 @@
         vendorHash = "sha256-H79018dCud68fYT0l3IGZXQvD22byhnw/GchsiYJc68=";
       };
 
-      overlays.${system}.default = _: _: { protrans = self.packages.${system}.default; };
+      overlays.${system} = _: _: { protrans = self.packages.${system}.default; };
 
       homeManagerModules.default = import ./home-manager.nix self;
     };
