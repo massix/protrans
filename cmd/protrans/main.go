@@ -132,8 +132,8 @@ func main() {
 	var configurationPath string
 
 	if len(os.Args) > 1 {
-		logrus.Infof("Parsing configuration from '%s'", configurationPath)
 		configurationPath = os.Args[1]
+		logrus.Infof("Parsing configuration from '%s'", configurationPath)
 	} else {
 		logrus.Info("Using default values")
 	}
