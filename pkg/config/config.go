@@ -33,6 +33,7 @@ type (
 func overrideWithEnvironment(iface, concrete any) {
 	types := reflect.TypeOf(iface)
 	values := reflect.ValueOf(concrete).Elem()
+
 	for i := 0; i < types.NumField(); i++ {
 		typeField := types.Field(i)
 		valueField := values.FieldByName(typeField.Name)

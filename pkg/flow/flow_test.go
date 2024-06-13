@@ -1,8 +1,8 @@
 package flow_test
 
 import (
+	"context"
 	"errors"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -87,6 +87,10 @@ func reset() {
 	peerPortSet = false
 }
 
+func createContext() (context.Context, context.CancelFunc) {
+	return context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
+}
+
 // Happy path test, everything is ok and working
 func Test_Flow_OK(t *testing.T) {
 	var wg sync.WaitGroup
@@ -96,22 +100,22 @@ func Test_Flow_OK(t *testing.T) {
 	nc := &fakeNatClient{true, true}
 	tc := &fakeTransmissionClient{true, false, true}
 
+	ctx, cancel := createContext()
+	defer cancel()
+
 	ipChan := make(chan string)
 	portChan := make(chan int)
-	done := make(chan os.Signal, 1)
 	defer func() {
 		close(ipChan)
 		close(portChan)
-		close(done)
 	}()
 
 	// Start the flow
-	go flow.FetchExternalIP(nc, &wg, ipChan, done)
-	go flow.MapPorts(nc, 600, &wg, ipChan, portChan, done)
-	go flow.TransmissionArgSetter(tc, &wg, portChan, done)
+	go flow.FetchExternalIP(ctx, nc, &wg, ipChan)
+	go flow.MapPorts(ctx, nc, 600, &wg, ipChan, portChan)
+	go flow.TransmissionArgSetter(ctx, tc, &wg, portChan)
 
-	<-time.After(3 * time.Second)
-	done <- os.Interrupt
+	<-ctx.Done()
 
 	// Wait for everyone to finish
 	wg.Wait()
@@ -127,23 +131,21 @@ func Test_Flow_NoExternalIP(t *testing.T) {
 	reset()
 	wg.Add(1)
 
+	ctx, cancel := createContext()
+	defer cancel()
+
 	nc := &fakeNatClient{false, true}
 
 	ipChan := make(chan string)
-	done := make(chan os.Signal, 1)
-	defer func() {
-		close(ipChan)
-		close(done)
-	}()
+	defer close(ipChan)
 
-	go flow.FetchExternalIP(nc, &wg, ipChan, done)
+	go flow.FetchExternalIP(ctx, nc, &wg, ipChan)
 
 	// We should fall into the timeout here
 	select {
 	case ip := <-ipChan:
 		t.Fatalf("Should not have received an IP, received: %s instead?", ip)
-	case <-time.After(5 * time.Second):
-		done <- os.Interrupt
+	case <-ctx.Done():
 	}
 
 	wg.Wait()
@@ -160,24 +162,23 @@ func Test_Flow_NoPortMapping(t *testing.T) {
 	wg.Add(2)
 
 	nc := &fakeNatClient{true, false}
+	ctx, cancel := createContext()
+	defer cancel()
 
 	ipChan := make(chan string)
 	portChan := make(chan int)
-	done := make(chan os.Signal, 1)
 	defer func() {
 		close(ipChan)
 		close(portChan)
-		close(done)
 	}()
 
-	go flow.FetchExternalIP(nc, &wg, ipChan, done)
-	go flow.MapPorts(nc, 600, &wg, ipChan, portChan, done)
+	go flow.FetchExternalIP(ctx, nc, &wg, ipChan)
+	go flow.MapPorts(ctx, nc, 600, &wg, ipChan, portChan)
 
 	select {
 	case p := <-portChan:
 		t.Fatalf("Should not have been able to open a port, opened %d instead?", p)
-	case <-time.After(5 * time.Second):
-		done <- os.Interrupt
+	case <-ctx.Done():
 	}
 
 	wg.Wait()
@@ -196,23 +197,23 @@ func Test_Flow_NoTransmissionConnection(t *testing.T) {
 	nc := &fakeNatClient{true, true}
 	tc := &fakeTransmissionClient{false, false, false}
 
+	ctx, cancel := createContext()
+	defer cancel()
+
 	ipChan := make(chan string)
 	portChan := make(chan int)
-	done := make(chan os.Signal, 1)
 	defer func() {
 		close(ipChan)
 		close(portChan)
-		close(done)
 	}()
 
 	// Start the flow
-	go flow.FetchExternalIP(nc, &wg, ipChan, done)
-	go flow.MapPorts(nc, 600, &wg, ipChan, portChan, done)
-	go flow.TransmissionArgSetter(tc, &wg, portChan, done)
+	go flow.FetchExternalIP(ctx, nc, &wg, ipChan)
+	go flow.MapPorts(ctx, nc, 600, &wg, ipChan, portChan)
+	go flow.TransmissionArgSetter(ctx, tc, &wg, portChan)
 
-	// Wait for everyone to finish
-	<-time.After(5 * time.Second)
-	done <- os.Interrupt
+	// Wait for the context to expire
+	<-ctx.Done()
 	wg.Wait()
 
 	assert.True(t, externalIPRetrieved)
@@ -228,24 +229,23 @@ func Test_Flow_TransmissionPortAlreadyOpen(t *testing.T) {
 
 	nc := &fakeNatClient{true, true}
 	tc := &fakeTransmissionClient{true, true, true}
+	ctx, cancel := createContext()
+	defer cancel()
 
 	ipChan := make(chan string)
 	portChan := make(chan int)
-	done := make(chan os.Signal, 1)
 	defer func() {
 		close(ipChan)
 		close(portChan)
-		close(done)
 	}()
 
 	// Start the flow
-	go flow.FetchExternalIP(nc, &wg, ipChan, done)
-	go flow.MapPorts(nc, 600, &wg, ipChan, portChan, done)
-	go flow.TransmissionArgSetter(tc, &wg, portChan, done)
+	go flow.FetchExternalIP(ctx, nc, &wg, ipChan)
+	go flow.MapPorts(ctx, nc, 600, &wg, ipChan, portChan)
+	go flow.TransmissionArgSetter(ctx, tc, &wg, portChan)
 
-	// Wait for everyone to finish
-	<-time.After(5 * time.Second)
-	done <- os.Interrupt
+	// Wait for the context to expire
+	<-ctx.Done()
 	wg.Wait()
 
 	assert.True(t, externalIPRetrieved)
@@ -261,24 +261,23 @@ func Test_Flow_TransmissionUnableToSet(t *testing.T) {
 
 	nc := &fakeNatClient{true, true}
 	tc := &fakeTransmissionClient{true, false, false}
+	ctx, cancel := createContext()
+	defer cancel()
 
 	ipChan := make(chan string)
 	portChan := make(chan int)
-	done := make(chan os.Signal, 1)
 	defer func() {
 		close(ipChan)
 		close(portChan)
-		close(done)
 	}()
 
 	// Start the flow
-	go flow.FetchExternalIP(nc, &wg, ipChan, done)
-	go flow.MapPorts(nc, 600, &wg, ipChan, portChan, done)
-	go flow.TransmissionArgSetter(tc, &wg, portChan, done)
+	go flow.FetchExternalIP(ctx, nc, &wg, ipChan)
+	go flow.MapPorts(ctx, nc, 600, &wg, ipChan, portChan)
+	go flow.TransmissionArgSetter(ctx, tc, &wg, portChan)
 
-	// Wait for everyone to finish
-	<-time.After(5 * time.Second)
-	done <- os.Interrupt
+	// Wait for the context to expire
+	<-ctx.Done()
 	wg.Wait()
 
 	assert.True(t, externalIPRetrieved)

@@ -1,7 +1,7 @@
 package flow
 
 import (
-	"os"
+	"context"
 	"sync"
 	"time"
 
@@ -10,8 +10,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func FetchExternalIP(natClient nat.NatClientI, wg *sync.WaitGroup, ipChan chan<- string, done chan os.Signal) {
+func FetchExternalIP(ctx context.Context, natClient nat.NatClientI, wg *sync.WaitGroup, ipChan chan<- string) {
 	running := true
+
+	timer := time.NewTimer(30 * time.Second)
+	defer timer.Stop()
 
 	for running {
 		ip, err := nat.GetExternalIP(natClient)
@@ -23,26 +26,25 @@ func FetchExternalIP(natClient nat.NatClientI, wg *sync.WaitGroup, ipChan chan<-
 		}
 
 		select {
-		case s := <-done:
+		case <-ctx.Done():
 			logrus.Info("Gracefully stopping gateway detector")
 			running = false
-			done <- s // Make sure everyone is leaving
-		case <-time.After(30 * time.Second):
+		case <-timer.C:
 			logrus.Debug("No signals received in 30 seconds, refreshing IP...")
+			timer.Reset(30 * time.Second)
 		}
 	}
 
 	wg.Done()
 }
 
-func MapPorts(natClient nat.NatClientI, portLifetime int, wg *sync.WaitGroup, ipChan <-chan string, portChan chan<- int, done chan os.Signal) {
+func MapPorts(ctx context.Context, natClient nat.NatClientI, portLifetime int, wg *sync.WaitGroup, ipChan <-chan string, portChan chan<- int) {
 	running := true
 
 	for running {
 		select {
 		case ip := <-ipChan:
-			var mappedTcpPort int
-			var mappedUdpPort int
+			var mappedTcpPort, mappedUdpPort int
 			var err error
 			logrus.Debugf("Mapping port for external IP: %s", ip)
 
@@ -65,17 +67,16 @@ func MapPorts(natClient nat.NatClientI, portLifetime int, wg *sync.WaitGroup, ip
 
 			logrus.Debugf("Sending port %d to channel", mappedTcpPort)
 			portChan <- mappedTcpPort
-		case s := <-done:
+		case <-ctx.Done():
 			logrus.Info("Gracefully stopping port mapper")
 			running = false
-			done <- s
 		}
 	}
 
 	wg.Done()
 }
 
-func TransmissionArgSetter(transmissionClient transmission.TransmissionClient, wg *sync.WaitGroup, portChan <-chan int, done chan os.Signal) {
+func TransmissionArgSetter(ctx context.Context, transmissionClient transmission.TransmissionClient, wg *sync.WaitGroup, portChan <-chan int) {
 	running := true
 
 	for running {
@@ -104,10 +105,9 @@ func TransmissionArgSetter(transmissionClient transmission.TransmissionClient, w
 			} else {
 				logrus.Warnf("Should set port: %d but Transmission is not connected", mappedPort)
 			}
-		case s := <-done:
+		case <-ctx.Done():
 			logrus.Info("Gracefully stopping Transmission Client")
 			running = false
-			done <- s
 		}
 	}
 
