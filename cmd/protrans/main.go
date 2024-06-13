@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -23,8 +24,13 @@ func dumpTransmissionConfiguration(conf *config.ProtransConfiguration) string {
 	return fmt.Sprintf("\tHost: %s\n\tPort: %d\n\tUsername: %s\n", conf.Transmission.Host, conf.Transmission.Port, conf.Transmission.Username)
 }
 
+var Version string
+
 func main() {
 	var configurationPath string
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
 
 	if len(os.Args) > 1 {
 		configurationPath = os.Args[1]
@@ -35,7 +41,9 @@ func main() {
 
 	conf := config.NewConfiguration(configurationPath, true)
 	logrus.SetLevel(conf.LogrusLogLevel())
-	logrus.Infof("Log level: %s\n", conf.LogrusLogLevel().String())
+
+	logrus.Infof("Protrans version: %s", Version)
+	logrus.Infof("Log level: %s", conf.LogrusLogLevel().String())
 	logrus.Infof("NAT Configuration:\n%s", dumpNatConfiguration(conf))
 	logrus.Infof("Transmission Configuration:\n%s", dumpTransmissionConfiguration(conf))
 
@@ -47,12 +55,11 @@ func main() {
 		logrus.Panic(err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Register to some signals
-	done := make(chan os.Signal, 126)
-	signal.Notify(done, syscall.SIGTERM)
-	signal.Notify(done, syscall.SIGINT)
-	signal.Notify(done, syscall.SIGABRT)
-	signal.Notify(done, syscall.SIGHUP)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGABRT, syscall.SIGHUP)
 
 	// Buffered channel to make sure we're refreshing it constantly
 	ipChan := make(chan string, 30)
@@ -62,20 +69,27 @@ func main() {
 	defer func() {
 		close(ipChan)
 		close(portChan)
-		close(done)
+		close(sigChan)
 	}()
 
-	var wg sync.WaitGroup
 	wg.Add(3)
 
 	// This goroutine will constantly check the external IP address and send it to a channel
-	go flow.FetchExternalIP(natClient, &wg, ipChan, done)
+	go flow.FetchExternalIP(ctx, natClient, &wg, ipChan)
 
 	// This goroutine will receive the IP address and create a port mapping which will be sent to another channel
-	go flow.MapPorts(natClient, int(conf.Nat.PortLifetime), &wg, ipChan, portChan, done)
+	go flow.MapPorts(ctx, natClient, int(conf.Nat.PortLifetime), &wg, ipChan, portChan)
 
 	// This goroutine will receive the mapped port and send it to Transmission if connected
-	go flow.TransmissionArgSetter(transmissionClient, &wg, portChan, done)
+	go flow.TransmissionArgSetter(ctx, transmissionClient, &wg, portChan)
 
-	wg.Wait()
+	select {
+	case <-ctx.Done():
+		logrus.Infof("Context closed, leaving")
+	case s := <-sigChan:
+		logrus.Infof("Received signal %q, leaving", s)
+		cancel()
+	}
+
+	logrus.Info("Waiting for goroutines to finish")
 }

@@ -5,20 +5,26 @@
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
+      hardeningDisable = [ "fortify" ];
+      version = "1.1";
     in
     {
       devShells.${system}.default = pkgs.mkShell {
+        inherit hardeningDisable;
         packages = with pkgs; [ go ];
-        hardeningDisable = [ "fortify" ];
       };
 
       packages.${system}.default = pkgs.buildGoModule {
+        inherit hardeningDisable version;
         pname = "protrans";
-        version = "1.0";
-        hardeningDisable = [ "fortify" ];
 
-        src = ./.;
+        src =
+          let
+            noSrcs = [ ".vscode" ".git" ".github" ".gitignore" ".envrc" ];
+          in
+          builtins.filterSource (path: _: ! builtins.elem (baseNameOf path) noSrcs) ./.;
 
+        ldflags = [ "-X 'main.Version=${version}'" ];
         vendorHash = "sha256-H79018dCud68fYT0l3IGZXQvD22byhnw/GchsiYJc68=";
       };
 
