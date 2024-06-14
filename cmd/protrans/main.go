@@ -1,18 +1,15 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
 	"github.com/hekmon/transmissionrpc"
 	natpmp "github.com/jackpal/go-nat-pmp"
 	"github.com/massix/protrans/internal/config"
-	"github.com/massix/protrans/internal/flow"
 	"github.com/massix/protrans/internal/nat"
 	"github.com/massix/protrans/internal/transmission"
 	"github.com/sirupsen/logrus"
@@ -30,9 +27,6 @@ var Version string
 
 func main() {
 	var configurationPath string
-
-	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	if len(os.Args) > 1 {
 		configurationPath = os.Args[1]
@@ -59,41 +53,74 @@ func main() {
 
 	transmissionClient := transmission.New(realTransmission)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	defer close(signals)
 
-	// Register to some signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGABRT, syscall.SIGHUP)
+	timerDuration := 10 * time.Second
+	timer := time.NewTimer(timerDuration)
+	defer timer.Stop()
 
-	// Buffered channel to make sure we're refreshing it constantly
-	ipChan := make(chan string, 30)
-	portChan := make(chan int, 30)
+	running := true
 
-	// Avoid leaking channels
-	defer func() {
-		close(ipChan)
-		close(portChan)
-		close(sigChan)
-	}()
+	for running {
+		timer.Reset(timerDuration)
 
-	wg.Add(3)
+		select {
+		case s := <-signals:
+			logrus.Infof("Received signal %q, leaving gracefully", s)
+			running = false
+		case <-timer.C:
+			logrus.Debug("Time to check")
 
-	// This goroutine will constantly check the external IP address and send it to a channel
-	go flow.FetchExternalIP(ctx, natClient, &wg, ipChan)
+			if transmissionClient.IsConnected() && !transmissionClient.IsPortOpen() {
+				logrus.Infof("Transmission is up @ %q", conf.Transmission.Host)
 
-	// This goroutine will receive the IP address and create a port mapping which will be sent to another channel
-	go flow.MapPorts(ctx, natClient, int(conf.Nat.PortLifetime), &wg, ipChan, portChan)
+				ext, err := natClient.GetExternalAddress()
+				if err != nil {
+					logrus.Warnf("Could not communicate with Gateway @ %q: %s", conf.Nat.Gateway, err)
+					continue
+				}
+				logrus.Debugf("Got external IP %q", ext)
 
-	// This goroutine will receive the mapped port and send it to Transmission if connected
-	go flow.TransmissionArgSetter(ctx, transmissionClient, &wg, portChan)
+				tcpPort, err := natClient.AddPortMapping("tcp", 600)
+				if err != nil {
+					logrus.Errorf("Could not add TCP port mapping: %s", err)
+					continue
+				}
+				logrus.Debugf("Mapped TCP port: %d", tcpPort)
 
-	select {
-	case <-ctx.Done():
-		logrus.Infof("Context closed, leaving")
-	case s := <-sigChan:
-		logrus.Infof("Received signal %q, leaving", s)
-		cancel()
+				udpPort, err := natClient.AddPortMapping("udp", 600)
+				if err != nil {
+					logrus.Errorf("Could not add UDP port mapping: %s", err)
+					continue
+				}
+				logrus.Debugf("Mapped UDP port: %d", udpPort)
+
+				if tcpPort != udpPort {
+					logrus.Errorf("Mapped ports differ in range: TCP=%d; UDP=%d", tcpPort, udpPort)
+					continue
+				}
+
+				if err := transmissionClient.SetPeerPort(tcpPort); err != nil {
+					logrus.Errorf("Could not set port %d in Transmission: %s", tcpPort, err)
+					continue
+				}
+
+				logrus.Debug("Port set!")
+				time.Sleep(5 * time.Second)
+
+				if transmissionClient.IsPortOpen() {
+					logrus.Infof("Successfully set port %d to Transmission and checked network connectivity", tcpPort)
+				} else {
+					logrus.Warnf("Set port %d to Transmission but was unable to check connectivity (it might take some time...)", tcpPort)
+				}
+			} else {
+				logrus.Debug("Transmission is not connected or port is already open")
+				continue
+			}
+		}
 	}
 
-	logrus.Info("Waiting for goroutines to finish")
+	logrus.Info("Closing ProTrans")
 }
