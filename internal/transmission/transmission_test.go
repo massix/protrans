@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/hekmon/transmissionrpc"
-	"github.com/massix/protrans/pkg/transmission"
+	"github.com/massix/protrans/internal/transmission"
 	"github.com/stretchr/testify/assert"
 )
 

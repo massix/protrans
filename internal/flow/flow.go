@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/massix/protrans/pkg/nat"
-	"github.com/massix/protrans/pkg/transmission"
+	"github.com/massix/protrans/internal/nat"
+	"github.com/massix/protrans/internal/transmission"
 	"github.com/sirupsen/logrus"
 )
 

@@ -9,9 +9,9 @@ import (
 
 	"github.com/hekmon/transmissionrpc"
 	natpmp "github.com/jackpal/go-nat-pmp"
-	"github.com/massix/protrans/pkg/flow"
-	"github.com/massix/protrans/pkg/nat"
-	"github.com/massix/protrans/pkg/transmission"
+	"github.com/massix/protrans/internal/flow"
+	"github.com/massix/protrans/internal/nat"
+	"github.com/massix/protrans/internal/transmission"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )

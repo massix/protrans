@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	natpmp "github.com/jackpal/go-nat-pmp"
-	"github.com/massix/protrans/pkg/nat"
+	"github.com/massix/protrans/internal/nat"
 	"github.com/stretchr/testify/assert"
 )
 
