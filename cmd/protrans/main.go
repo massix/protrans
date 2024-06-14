@@ -13,6 +13,8 @@ import (
 	natpmp "github.com/jackpal/go-nat-pmp"
 	"github.com/massix/protrans/pkg/config"
 	"github.com/massix/protrans/pkg/flow"
+	"github.com/massix/protrans/pkg/nat"
+	"github.com/massix/protrans/pkg/transmission"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,13 +49,15 @@ func main() {
 	logrus.Infof("NAT Configuration:\n%s", dumpNatConfiguration(conf))
 	logrus.Infof("Transmission Configuration:\n%s", dumpTransmissionConfiguration(conf))
 
-	natClient := natpmp.NewClientWithTimeout(conf.GatewayIP(), 2*time.Second)
-	transmissionClient, err := transmissionrpc.New(conf.Transmission.Host, conf.Transmission.Username, conf.Transmission.Password, &transmissionrpc.AdvancedConfig{
+	natClient := nat.New(natpmp.NewClientWithTimeout(conf.GatewayIP(), 2*time.Second))
+	realTransmission, err := transmissionrpc.New(conf.Transmission.Host, conf.Transmission.Username, conf.Transmission.Password, &transmissionrpc.AdvancedConfig{
 		Port: conf.Transmission.Port,
 	})
 	if err != nil {
 		logrus.Panic(err)
 	}
+
+	transmissionClient := transmission.New(realTransmission)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

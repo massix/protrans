@@ -10,14 +10,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func FetchExternalIP(ctx context.Context, natClient nat.NatClientI, wg *sync.WaitGroup, ipChan chan<- string) {
+func FetchExternalIP(ctx context.Context, natClient nat.Client, wg *sync.WaitGroup, ipChan chan<- string) {
 	running := true
 
 	timer := time.NewTimer(30 * time.Second)
 	defer timer.Stop()
 
 	for running {
-		ip, err := nat.GetExternalIP(natClient)
+		ip, err := natClient.GetExternalAddress()
 		if err != nil {
 			logrus.Warn(err)
 		} else {
@@ -38,7 +38,7 @@ func FetchExternalIP(ctx context.Context, natClient nat.NatClientI, wg *sync.Wai
 	wg.Done()
 }
 
-func MapPorts(ctx context.Context, natClient nat.NatClientI, portLifetime int, wg *sync.WaitGroup, ipChan <-chan string, portChan chan<- int) {
+func MapPorts(ctx context.Context, natClient nat.Client, portLifetime int, wg *sync.WaitGroup, ipChan <-chan string, portChan chan<- int) {
 	running := true
 
 	for running {
@@ -48,13 +48,13 @@ func MapPorts(ctx context.Context, natClient nat.NatClientI, portLifetime int, w
 			var err error
 			logrus.Debugf("Mapping port for external IP: %s", ip)
 
-			mappedTcpPort, err = nat.AddPortMapping(natClient, "tcp", portLifetime)
+			mappedTcpPort, err = natClient.AddPortMapping("tcp", portLifetime)
 			if err != nil {
 				logrus.Errorf("Unable to create port mapping: %s", err)
 				continue
 			}
 
-			mappedUdpPort, err = nat.AddPortMapping(natClient, "udp", portLifetime)
+			mappedUdpPort, err = natClient.AddPortMapping("udp", portLifetime)
 			if err != nil {
 				logrus.Errorf("Unable to create port mapping: %s", err)
 				continue
@@ -76,20 +76,20 @@ func MapPorts(ctx context.Context, natClient nat.NatClientI, portLifetime int, w
 	wg.Done()
 }
 
-func TransmissionArgSetter(ctx context.Context, transmissionClient transmission.TransmissionClient, wg *sync.WaitGroup, portChan <-chan int) {
+func TransmissionArgSetter(ctx context.Context, transmissionClient transmission.Client, wg *sync.WaitGroup, portChan <-chan int) {
 	running := true
 
 	for running {
 		select {
 		case mappedPort := <-portChan:
-			if transmission.IsConnected(transmissionClient) {
+			if transmissionClient.IsConnected() {
 				logrus.Debug("Transmission is connected")
-				if transmission.IsPortOpen(transmissionClient) {
+				if transmissionClient.IsPortOpen() {
 					logrus.Debug("Port is already set in Transmission, nothing to do")
 					continue
 				}
 
-				if err := transmission.SetPeerPort(transmissionClient, mappedPort); err != nil {
+				if err := transmissionClient.SetPeerPort(mappedPort); err != nil {
 					logrus.Error(err)
 					continue
 				}
@@ -97,7 +97,7 @@ func TransmissionArgSetter(ctx context.Context, transmissionClient transmission.
 				logrus.Debug("Port set!")
 				time.Sleep(3 * time.Second)
 
-				if transmission.IsPortOpen(transmissionClient) {
+				if transmissionClient.IsPortOpen() {
 					logrus.Infof("Successfully set port %d to Transmission and checked network connectivity", mappedPort)
 				} else {
 					logrus.Warnf("Set port %d to Transmission but was unable to check connectivity (this may be normal, it might take some time before the NAT is recognised)", mappedPort)

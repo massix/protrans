@@ -10,6 +10,8 @@ import (
 	"github.com/hekmon/transmissionrpc"
 	natpmp "github.com/jackpal/go-nat-pmp"
 	"github.com/massix/protrans/pkg/flow"
+	"github.com/massix/protrans/pkg/nat"
+	"github.com/massix/protrans/pkg/transmission"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -97,8 +99,8 @@ func Test_Flow_OK(t *testing.T) {
 	reset()
 	wg.Add(3)
 
-	nc := &fakeNatClient{true, true}
-	tc := &fakeTransmissionClient{true, false, true}
+	nc := nat.New(&fakeNatClient{true, true})
+	tc := transmission.New(&fakeTransmissionClient{true, false, true})
 
 	ctx, cancel := createContext()
 	defer cancel()
@@ -134,7 +136,7 @@ func Test_Flow_NoExternalIP(t *testing.T) {
 	ctx, cancel := createContext()
 	defer cancel()
 
-	nc := &fakeNatClient{false, true}
+	nc := nat.New(&fakeNatClient{false, true})
 
 	ipChan := make(chan string)
 	defer close(ipChan)
@@ -161,7 +163,7 @@ func Test_Flow_NoPortMapping(t *testing.T) {
 	reset()
 	wg.Add(2)
 
-	nc := &fakeNatClient{true, false}
+	nc := nat.New(&fakeNatClient{true, false})
 	ctx, cancel := createContext()
 	defer cancel()
 
@@ -194,8 +196,8 @@ func Test_Flow_NoTransmissionConnection(t *testing.T) {
 	reset()
 	wg.Add(3)
 
-	nc := &fakeNatClient{true, true}
-	tc := &fakeTransmissionClient{false, false, false}
+	nc := nat.New(&fakeNatClient{true, true})
+	tc := transmission.New(&fakeTransmissionClient{false, false, false})
 
 	ctx, cancel := createContext()
 	defer cancel()
@@ -227,8 +229,8 @@ func Test_Flow_TransmissionPortAlreadyOpen(t *testing.T) {
 	reset()
 	wg.Add(3)
 
-	nc := &fakeNatClient{true, true}
-	tc := &fakeTransmissionClient{true, true, true}
+	nc := nat.New(&fakeNatClient{true, true})
+	tc := transmission.New(&fakeTransmissionClient{true, true, true})
 	ctx, cancel := createContext()
 	defer cancel()
 
@@ -259,8 +261,8 @@ func Test_Flow_TransmissionUnableToSet(t *testing.T) {
 	reset()
 	wg.Add(3)
 
-	nc := &fakeNatClient{true, true}
-	tc := &fakeTransmissionClient{true, false, false}
+	nc := nat.New(&fakeNatClient{true, true})
+	tc := transmission.New(&fakeTransmissionClient{true, false, false})
 	ctx, cancel := createContext()
 	defer cancel()
 
