@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	natpmp "github.com/jackpal/go-nat-pmp"
-	"github.com/massix/protrans/pkg/nat"
+	"github.com/massix/protrans/internal/nat"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,32 +42,41 @@ func (m *MockClient) AddPortMapping(protocol string, par1, par2, par3 int) (*nat
 	}, nil
 }
 
+func newFakeClient(externalAddressShouldFail, portMappingShouldFail bool) nat.Client {
+	return nat.New(&MockClient{externalAddressShouldFail, portMappingShouldFail})
+}
+
 func Test_GetExternalIP_OK(t *testing.T) {
-	res, err := nat.GetExternalIP(&MockClient{false, false})
+	cl := newFakeClient(false, false)
+	res, err := cl.GetExternalAddress()
 	assert.Nil(t, err)
 	assert.Equal(t, "10.20.30.40", res)
 }
 
 func Test_GetExternalIP_Fail(t *testing.T) {
-	res, err := nat.GetExternalIP(&MockClient{true, false})
+	cl := newFakeClient(true, false)
+	res, err := cl.GetExternalAddress()
 	assert.Emptyf(t, res, "IP Address should be empty")
 	assert.Errorf(t, err, "NAT Client is not connected")
 }
 
 func Test_PortMapping_OK(t *testing.T) {
-	res, err := nat.AddPortMapping(&MockClient{false, false}, "tcp", 30)
+	cl := newFakeClient(false, false)
+	res, err := cl.AddPortMapping("tcp", 600)
 	assert.Nil(t, err)
 	assert.Equal(t, 1234, res)
 }
 
 func Test_PortMapping_FailProtocol(t *testing.T) {
-	res, err := nat.AddPortMapping(&MockClient{false, false}, "unknown", 30)
+	cl := newFakeClient(false, false)
+	res, err := cl.AddPortMapping("unknown", 600)
 	assert.Empty(t, res)
 	assert.Errorf(t, err, "Wrong protocol")
 }
 
 func Test_PortMapping_Fail(t *testing.T) {
-	res, err := nat.AddPortMapping(&MockClient{false, true}, "udp", 30)
+	cl := newFakeClient(false, true)
+	res, err := cl.AddPortMapping("udp", 600)
 	assert.Empty(t, res)
 	assert.Errorf(t, err, "Failure when trying to map port")
 }

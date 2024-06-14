@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/massix/protrans/pkg/config"
+	"github.com/massix/protrans/internal/config"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )

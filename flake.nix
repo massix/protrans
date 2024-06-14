@@ -6,7 +6,7 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       hardeningDisable = [ "fortify" ];
-      version = "1.1";
+      version = "1.2";
     in
     {
       devShells.${system}.default = pkgs.mkShell {
