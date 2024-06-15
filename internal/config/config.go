@@ -55,7 +55,7 @@ func overrideWithEnvironment(iface, concrete any) {
 	}
 }
 
-func NewConfiguration(filePath string, shouldUseEnvironment bool) *ProtransConfiguration {
+func New(filePath string, shouldUseEnvironment bool) *ProtransConfiguration {
 	// Init with some default values
 	conf := &ProtransConfiguration{
 		Transmission: &TransmissionConfiguration{
@@ -93,6 +93,23 @@ func NewConfiguration(filePath string, shouldUseEnvironment bool) *ProtransConfi
 	}
 
 	return conf
+}
+
+func (nc *NatConfiguration) String() string {
+	return fmt.Sprintf("Nat{Gateway=%q PortLifetime=%d}", nc.Gateway, nc.PortLifetime)
+}
+
+func (tc *TransmissionConfiguration) String() string {
+	password := "not set"
+	if tc.Password != "" {
+		password = "set"
+	}
+
+	return fmt.Sprintf("Transmission{Host=%q Port=%d Username=%q Password=%q}", tc.Host, tc.Port, tc.Username, password)
+}
+
+func (pc *ProtransConfiguration) String() string {
+	return fmt.Sprintf("ProTrans{LogLevel=%q %s %s}", pc.LogLevel, pc.Nat, pc.Transmission)
 }
 
 func (c *ProtransConfiguration) LogrusLogLevel() (level logrus.Level) {
