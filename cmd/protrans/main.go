@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,14 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func dumpNatConfiguration(conf *config.ProtransConfiguration) string {
-	return fmt.Sprintf("\tGateway: %s\n\tPortLifetime: %d\n", conf.Nat.Gateway, conf.Nat.PortLifetime)
-}
-
-func dumpTransmissionConfiguration(conf *config.ProtransConfiguration) string {
-	return fmt.Sprintf("\tHost: %s\n\tPort: %d\n\tUsername: %s\n", conf.Transmission.Host, conf.Transmission.Port, conf.Transmission.Username)
-}
-
 var Version string
 
 func main() {
@@ -35,13 +26,11 @@ func main() {
 		logrus.Info("Using default values")
 	}
 
-	conf := config.NewConfiguration(configurationPath, true)
+	conf := config.New(configurationPath, true)
 	logrus.SetLevel(conf.LogrusLogLevel())
 
 	logrus.Infof("Protrans version: %s", Version)
-	logrus.Infof("Log level: %s", conf.LogrusLogLevel().String())
-	logrus.Infof("NAT Configuration:\n%s", dumpNatConfiguration(conf))
-	logrus.Infof("Transmission Configuration:\n%s", dumpTransmissionConfiguration(conf))
+	logrus.Info(conf)
 
 	natClient := nat.New(natpmp.NewClientWithTimeout(conf.GatewayIP(), 2*time.Second))
 	realTransmission, err := transmissionrpc.New(conf.Transmission.Host, conf.Transmission.Username, conf.Transmission.Password, &transmissionrpc.AdvancedConfig{
