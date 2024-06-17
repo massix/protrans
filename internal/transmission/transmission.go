@@ -18,17 +18,17 @@ type TransmissionRpcClient interface {
 	SessionArgumentsGet() (*transmissionrpc.SessionArguments, error)
 }
 
-type EncapsulatedClient struct {
-	client TransmissionRpcClient
+type encapsulatedClient struct {
+	TransmissionRpcClient
 }
 
 func New(client TransmissionRpcClient) Client {
-	return &EncapsulatedClient{client}
+	return &encapsulatedClient{client}
 }
 
 // GetCurrentPort implements Client.
-func (e *EncapsulatedClient) GetCurrentPort() (int, error) {
-	res, err := e.client.SessionArgumentsGet()
+func (ec *encapsulatedClient) GetCurrentPort() (int, error) {
+	res, err := ec.SessionArgumentsGet()
 	if err != nil {
 		return 0, err
 	}
@@ -37,21 +37,21 @@ func (e *EncapsulatedClient) GetCurrentPort() (int, error) {
 }
 
 // IsConnected implements Client.
-func (e *EncapsulatedClient) IsConnected() bool {
-	_, err := e.client.SessionStats()
+func (ec *encapsulatedClient) IsConnected() bool {
+	_, err := ec.SessionStats()
 	return err == nil
 }
 
 // IsPortOpen implements Client.
-func (e *EncapsulatedClient) IsPortOpen() bool {
-	res, err := e.client.PortTest()
+func (ec *encapsulatedClient) IsPortOpen() bool {
+	res, err := ec.PortTest()
 	return res && err == nil
 }
 
 // SetPeerPort implements Client.
-func (e *EncapsulatedClient) SetPeerPort(port int) error {
+func (ec *encapsulatedClient) SetPeerPort(port int) error {
 	newPort := int64(port)
-	return e.client.SessionArgumentsSet(&transmissionrpc.SessionArguments{
+	return ec.SessionArgumentsSet(&transmissionrpc.SessionArguments{
 		PeerPort: &newPort,
 	})
 }

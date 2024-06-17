@@ -48,35 +48,35 @@ func newFakeClient(externalAddressShouldFail, portMappingShouldFail bool) nat.Cl
 
 func Test_GetExternalIP_OK(t *testing.T) {
 	cl := newFakeClient(false, false)
-	res, err := cl.GetExternalAddress()
+	res, err := cl.GetAddress()
 	assert.Nil(t, err)
 	assert.Equal(t, "10.20.30.40", res)
 }
 
 func Test_GetExternalIP_Fail(t *testing.T) {
 	cl := newFakeClient(true, false)
-	res, err := cl.GetExternalAddress()
+	res, err := cl.GetAddress()
 	assert.Emptyf(t, res, "IP Address should be empty")
 	assert.Errorf(t, err, "NAT Client is not connected")
 }
 
 func Test_PortMapping_OK(t *testing.T) {
 	cl := newFakeClient(false, false)
-	res, err := cl.AddPortMapping("tcp", 600)
+	res, err := cl.AddMapping("tcp", 600)
 	assert.Nil(t, err)
 	assert.Equal(t, 1234, res)
 }
 
 func Test_PortMapping_FailProtocol(t *testing.T) {
 	cl := newFakeClient(false, false)
-	res, err := cl.AddPortMapping("unknown", 600)
+	res, err := cl.AddMapping("unknown", 600)
 	assert.Empty(t, res)
 	assert.Errorf(t, err, "Wrong protocol")
 }
 
 func Test_PortMapping_Fail(t *testing.T) {
 	cl := newFakeClient(false, true)
-	res, err := cl.AddPortMapping("udp", 600)
+	res, err := cl.AddMapping("udp", 600)
 	assert.Empty(t, res)
 	assert.Errorf(t, err, "Failure when trying to map port")
 }
