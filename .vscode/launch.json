@@ -5,7 +5,10 @@
       "type": "delve",
       "name": "Debug",
       "request": "launch",
-      "program": "${workspaceFolder}/cmd/protrans/*"
+      "program": "${workspaceFolder}/cmd/protrans/main.go",
+      "env": {
+        "PROTRANS_LOG_LEVEL": "DEBUG"
+      }
     }
   ]
 }

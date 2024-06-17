@@ -20,7 +20,7 @@ func Test_ShouldParseConfiguration(t *testing.T) {
 	assert.Equal(t, uint16(1234), res.Transmission.Port)             // Overridden by environment
 	assert.Equal(t, "from_configuration", res.Transmission.Username) // From configuration file
 	assert.Equal(t, "192.168.1.1", res.Nat.Gateway)                  // Overridden by environment
-	assert.Equal(t, uint16(600), res.Nat.PortLifetime)               // Default value
+	assert.Equal(t, uint16(120), res.Nat.PortLifetime)               // Default value
 	assert.Equal(t, logrus.WarnLevel, res.LogrusLogLevel())          // From configuration file
 }
 

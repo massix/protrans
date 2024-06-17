@@ -12,26 +12,26 @@ func ipToString(ip [4]byte) string {
 
 // This will make it easier to mock the tests
 type Client interface {
-	GetExternalAddress() (string, error)
-	AddPortMapping(protocol string, lifetime int) (int, error)
+	GetAddress() (string, error)
+	AddMapping(protocol string, lifetime int) (int, error)
 }
 
 type NatpmpClient interface {
-	AddPortMapping(protocol string, internalPort, externalPort, lifetime int) (*natpmp.AddPortMappingResult, error)
 	GetExternalAddress() (*natpmp.GetExternalAddressResult, error)
+	AddPortMapping(protocol string, internalPort, externalPort, lifetime int) (*natpmp.AddPortMappingResult, error)
 }
 
-type EncapsulatedClient struct {
-	Client NatpmpClient
+type encapsulatedClient struct {
+	NatpmpClient
 }
 
 func New(client NatpmpClient) Client {
-	return &EncapsulatedClient{client}
+	return &encapsulatedClient{client}
 }
 
 // AddPortMapping implements Client.
-func (e *EncapsulatedClient) AddPortMapping(protocol string, lifetime int) (int, error) {
-	res, err := e.Client.AddPortMapping(protocol, 0, 1, lifetime)
+func (ec *encapsulatedClient) AddMapping(protocol string, lifetime int) (int, error) {
+	res, err := ec.AddPortMapping(protocol, 0, 1, lifetime)
 	if err != nil {
 		return 0, &PortMappingUnavailableError{}
 	}
@@ -40,8 +40,8 @@ func (e *EncapsulatedClient) AddPortMapping(protocol string, lifetime int) (int,
 }
 
 // GetExternalAddress implements Client.
-func (e *EncapsulatedClient) GetExternalAddress() (string, error) {
-	res, err := e.Client.GetExternalAddress()
+func (ec *encapsulatedClient) GetAddress() (string, error) {
+	res, err := ec.GetExternalAddress()
 	if err != nil {
 		return "", &ErrClientNotConnected{}
 	}

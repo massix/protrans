@@ -46,40 +46,56 @@ func main() {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	defer close(signals)
 
-	timerDuration := 10 * time.Second
-	timer := time.NewTimer(timerDuration)
+	defaultTimerDuration := 10 * time.Second
+	timer := time.NewTimer(defaultTimerDuration)
 	defer timer.Stop()
 
 	running := true
 
+	currentTimerDuration := defaultTimerDuration
+
 	for running {
-		timer.Reset(timerDuration)
+		timer.Reset(currentTimerDuration)
 
 		select {
+
 		case s := <-signals:
 			logrus.Infof("Received signal %q, leaving gracefully", s)
 			running = false
+
 		case <-timer.C:
 			logrus.Debug("Time to check")
 
-			if transmissionClient.IsConnected() && !transmissionClient.IsPortOpen() {
+			if transmissionClient.IsConnected() {
 				logrus.Infof("Transmission is up @ %q", conf.Transmission.Host)
 
-				ext, err := natClient.GetExternalAddress()
+				if transmissionClient.IsPortOpen() {
+					if currentPort, err := transmissionClient.GetCurrentPort(); err != nil {
+						logrus.Warnf("Port is already open, but could not check it: %s", err)
+					} else {
+						logrus.Infof("Port %d is already open!", currentPort)
+					}
+
+					currentTimerDuration = max(time.Duration(conf.Nat.PortLifetime-20)*time.Second, defaultTimerDuration)
+					logrus.Debugf("Setting new timer duration to %q", currentTimerDuration)
+					continue
+				}
+
+				ext, err := natClient.GetAddress()
 				if err != nil {
 					logrus.Warnf("Could not communicate with Gateway @ %q: %s", conf.Nat.Gateway, err)
 					continue
 				}
 				logrus.Debugf("Got external IP %q", ext)
 
-				tcpPort, err := natClient.AddPortMapping("tcp", 600)
+				tcpPort, err := natClient.AddMapping("tcp", int(conf.Nat.PortLifetime))
 				if err != nil {
 					logrus.Errorf("Could not add TCP port mapping: %s", err)
 					continue
 				}
 				logrus.Debugf("Mapped TCP port: %d", tcpPort)
 
-				udpPort, err := natClient.AddPortMapping("udp", 600)
+				udpPort, err := natClient.AddMapping("udp", int(conf.Nat.PortLifetime))
 				if err != nil {
 					logrus.Errorf("Could not add UDP port mapping: %s", err)
 					continue
@@ -105,7 +121,8 @@ func main() {
 					logrus.Warnf("Set port %d to Transmission but was unable to check connectivity (it might take some time...)", tcpPort)
 				}
 			} else {
-				logrus.Debug("Transmission is not connected or port is already open")
+				logrus.Debug("Transmission is not connected")
+				currentTimerDuration = defaultTimerDuration
 				continue
 			}
 		}
