@@ -64,7 +64,7 @@ func New(filePath string, shouldUseEnvironment bool) *ProtransConfiguration {
 		},
 		Nat: &NatConfiguration{
 			Gateway:      "10.2.0.1",
-			PortLifetime: 600,
+			PortLifetime: 120,
 		},
 
 		LogLevel: "INFO",

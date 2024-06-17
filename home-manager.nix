@@ -36,7 +36,7 @@ in
       };
       nat = {
         gateway = mkStringOption "IP Address of the Gateway for NAT" "10.2.0.1";
-        portLifeTime = mkIntOption "Port Lifetime in seconds" 600;
+        portLifeTime = mkIntOption "Port Lifetime in seconds" 120;
       };
     };
   };
