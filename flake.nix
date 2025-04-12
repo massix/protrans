@@ -6,7 +6,7 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       hardeningDisable = [ "fortify" ];
-      version = "1.4";
+      version = "1.5";
     in
     {
       devShells.${system}.default = pkgs.mkShell {
@@ -24,7 +24,7 @@
           in
           builtins.filterSource (path: _: ! builtins.elem (baseNameOf path) noSrcs) ./.;
 
-        CGO_ENABLED = "0";
+        env.CGO_ENABLED = "0";
         ldflags = [ "-X 'main.Version=${version}'" ];
         vendorHash = "sha256-H79018dCud68fYT0l3IGZXQvD22byhnw/GchsiYJc68=";
       };
