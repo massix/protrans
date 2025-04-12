@@ -34,7 +34,7 @@ func overrideWithEnvironment(iface, concrete any) {
 	types := reflect.TypeOf(iface)
 	values := reflect.ValueOf(concrete).Elem()
 
-	for i := 0; i < types.NumField(); i++ {
+	for i := range types.NumField() {
 		typeField := types.Field(i)
 		valueField := values.FieldByName(typeField.Name)
 		if env, ok := typeField.Tag.Lookup("env"); ok && valueField.CanSet() && valueField.IsValid() {
@@ -87,6 +87,8 @@ func New(filePath string, shouldUseEnvironment bool) *ProtransConfiguration {
 		if logLevel, ok := os.LookupEnv("PROTRANS_LOG_LEVEL"); ok {
 			conf.LogLevel = logLevel
 		}
+
+		logrus.Infof("Using environment variables")
 
 		overrideWithEnvironment(TransmissionConfiguration{}, conf.Transmission)
 		overrideWithEnvironment(NatConfiguration{}, conf.Nat)
